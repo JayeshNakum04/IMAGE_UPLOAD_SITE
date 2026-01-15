@@ -325,7 +325,15 @@ form.addEventListener("submit", e => {
     
     // Change this to match your server endpoint - currently using root "/"
     xhr.open("POST", window.location.pathname, true);
-    xhr.responseType = "blob";
+    
+    fetch(form.action, {
+        method: "POST",
+        body: formData
+    }).then(res => {
+        if (!res.ok) throw new Error();
+        document.getElementById("status").innerText = "✅ Upload successful. You can close this page.";
+    });
+
 
     progressContainer.style.display = "block";
     uploadBtn.disabled = true;

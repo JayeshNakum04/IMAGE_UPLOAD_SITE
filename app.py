@@ -56,11 +56,10 @@ def generate():
 @app.route("/upload/<token>", methods=["GET", "POST"])
 def upload(token):
     if token not in TOKEN_STORE:
-        abort(403, "Invalid or used link")
+        abort(403)
 
     if request.method == "POST":
-        password = request.form.get("password")
-        if password != UPLOAD_PASSWORD:
+        if request.form.get("password") != UPLOAD_PASSWORD:
             abort(401)
 
         files = [f for f in request.files.getlist("photos") if f.filename]
@@ -68,14 +67,14 @@ def upload(token):
             abort(400)
 
         upload_id = str(uuid.uuid4())
-        folder = os.path.join(UPLOAD_FOLDER, upload_id)
-        os.makedirs(folder)
+        zip_path = os.path.join(UPLOAD_FOLDER, f"{upload_id}.zip")
 
-        for f in files:
-            f.save(os.path.join(folder, f.filename))
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zipf:
+            for f in files:
+                zipf.writestr(f.filename, f.read())
 
         TOKEN_STORE.remove(token)
-        return "<h3>Upload successful ✅</h3>"
+        return "UPLOAD_OK"
 
     return render_template("upload.html")
 
@@ -84,54 +83,51 @@ def upload(token):
 # ======================
 @app.route("/inbox", methods=["GET", "POST"])
 def inbox():
-    cleanup_expired_uploads()
-
     if request.method == "POST":
         if request.form.get("password") != INBOX_PASSWORD:
-            abort(401)
+            return render_template(
+                "inbox.html",
+                logged_in=False,
+                error="Wrong password"
+            )
 
-        uploads = sorted(
-            os.listdir(UPLOAD_FOLDER),
-            key=lambda x: os.path.getctime(os.path.join(UPLOAD_FOLDER, x)),
-            reverse=True
+        uploads = []
+        for f in os.listdir(UPLOAD_FOLDER):
+            if f.endswith(".zip"):
+                uploads.append({
+                    "id": f,
+                    "time": time.ctime(os.path.getctime(os.path.join(UPLOAD_FOLDER, f)))
+                })
+
+        return render_template(
+            "inbox.html",
+            logged_in=True,
+            uploads=uploads
         )
 
-        data = []
-        for u in uploads:
-            path = os.path.join(UPLOAD_FOLDER, u)
-            data.append({
-                "id": u,
-                "time": time.ctime(os.path.getctime(path))
-            })
-
-        return render_template("inbox.html", uploads=data)
-
-    return render_template("inbox_login.html")
+    return render_template("inbox.html", logged_in=False)
 
 # ======================
 # DOWNLOAD + DELETE
 # ======================
-@app.route("/download/<upload_id>")
-def download(upload_id):
-    folder = os.path.join(UPLOAD_FOLDER, upload_id)
-    if not os.path.exists(folder):
+from flask import after_this_request
+
+@app.route("/download/<filename>")
+def download(filename):
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(path):
         abort(404)
 
-    zip_path = f"{folder}.zip"
+    @after_this_request
+    def cleanup(response):
+        try:
+            os.remove(path)
+        except:
+            pass
+        return response
 
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zipf:
-        for f in os.listdir(folder):
-            zipf.write(os.path.join(folder, f), f)
+    return send_file(path, as_attachment=True)
 
-    for f in os.listdir(folder):
-        os.remove(os.path.join(folder, f))
-    os.rmdir(folder)
-
-    return send_file(zip_path, as_attachment=True)
-
-@app.route("/__routes")
-def show_routes():
-    return "<br>".join(sorted(rule.rule for rule in app.url_map.iter_rules()))
 
 # ======================
 # RUN (RENDER SAFE)
