@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Inbox Login</title>
+<style>
+body {
+    text-align: center;
+    font-family: Arial, sans-serif;
+    background: #f4f4f4;
+}
+.container {
+    margin-top: 100px;
+    background: white;
+    display: inline-block;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+}
+.input-box {
+    position: relative;
+    width: 260px;
+    margin: auto;
+}
+input {
+    width: 100%;
+    padding: 10px 40px 10px 10px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+.eye {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    font-size: 16px;
+}
+button {
+    margin-top: 20px;
+    padding: 10px 25px;
+    border: none;
+    border-radius: 8px;
+    background: #007bff;
+    color: white;
+    cursor: pointer;
+    font-size: 15px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>🔐 Inbox Login</h2>
+
+    <form method="POST">
+        <div class="input-box">
+            <input
+                type="password"
+                name="password"
+                id="passwordInput"
+                placeholder="Inbox password"
+                required
+            >
+            <span class="eye" onclick="togglePassword()">👁</span>
+        </div>
+
+        <button type="submit">Enter Inbox</button>
+    </form>
+</div>
+
+<script>
+function togglePassword() {
+    const pwd = document.getElementById("passwordInput");
+    pwd.type = pwd.type === "password" ? "text" : "password";
+}
+</script>
+
+</body>
+</html>

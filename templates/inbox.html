@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inbox</title>
+</head>
+<body>
+<h2>Uploaded Files Inbox</h2>
+
+{% if uploads %}
+    <ul>
+    {% for u in uploads %}
+        <li>
+            Upload {{ loop.index }} →
+            <a href="/download/{{ u }}">Download</a>
+        </li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No uploads yet.</p>
+{% endif %}
+
+</body>
+</html>
