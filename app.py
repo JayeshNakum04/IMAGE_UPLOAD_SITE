@@ -7,8 +7,9 @@ from flask import Flask, request, render_template, send_file, abort
 
 app = Flask(__name__)
 
-UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "2409004")
-INBOX_PASSWORD = os.environ.get("INBOX_PASSWORD", "admin123")
+UPLOAD_PASSWORD = os.environ["UPLOAD_PASSWORD"]
+INBOX_PASSWORD = os.environ["INBOX_PASSWORD"]
+
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
