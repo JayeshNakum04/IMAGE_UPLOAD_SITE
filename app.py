@@ -1,6 +1,8 @@
 import os
 import uuid
 import zipfile
+import time
+from flask import after_this_request
 from flask import Flask, request, render_template, send_file, abort
 
 app = Flask(__name__)
@@ -13,12 +15,47 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 VALID_TOKENS = set()
 
+EXPIRY_SECONDS = 24 * 60 * 60  # 24 hours
+
+def cleanup_old_files():
+    now = time.time()
+    for f in os.listdir(UPLOAD_FOLDER):
+        if not f.endswith(".zip"):
+            continue
+
+        path = os.path.join(UPLOAD_FOLDER, f)
+        if now - os.path.getctime(path) > EXPIRY_SECONDS:
+            os.remove(path)
+
+
 # -------- Generate one-time upload link --------
 @app.route("/generate")
 def generate():
     token = str(uuid.uuid4())
     VALID_TOKENS.add(token)
-    return f"Upload link: /upload/{token}"
+
+    upload_url = request.host_url.rstrip("/") + f"/upload/{token}"
+    inbox_url = request.host_url.rstrip("/") + "/inbox"
+
+    return f"""
+    <html>
+    <body style="font-family:Arial;background:#f2f3f7;padding:20px">
+        <div style="margin-bottom:20px">
+            <a href="/generate">🔁 Generate New Link</a> |
+            <a href="/inbox">📥 Inbox</a>
+        </div>
+
+        <h2>✅ Upload Link Generated</h2>
+        <p>Share this link:</p>
+        <p>
+            <a href="{upload_url}" target="_blank">{upload_url}</a>
+        </p>
+        <p><b>Note:</b> Link works only once.</p>
+    </body>
+    </html>
+    """
+
+
 
 # -------- Upload page --------
 @app.route("/upload/<token>", methods=["GET", "POST"])
@@ -49,12 +86,21 @@ def upload(token):
 # -------- Inbox --------
 @app.route("/inbox", methods=["GET", "POST"])
 def inbox():
+    
+    cleanup_old_files()
+    
     if request.method == "POST":
         if request.form.get("password") != INBOX_PASSWORD:
             return render_template("inbox.html", error="Wrong password")
 
         files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith(".zip")]
-        return render_template("inbox.html", files=files, password=request.form.get("password"))
+        return render_template(
+                "inbox.html",
+                files=files,
+                password=request.form.get("password"),
+                base_url=request.host_url.rstrip("/")
+        )
+
 
     return render_template("inbox.html")
 
@@ -65,9 +111,21 @@ def download(filename):
     path = os.path.join(UPLOAD_FOLDER, filename)
     if not os.path.exists(path):
         abort(404)
+
+    @after_this_request
+    def remove_file(response):
+        try:
+            os.remove(path)
+        except:
+            pass
+        return response
+
     return send_file(path, as_attachment=True)
 
+
 #--------Delete from inbox -------
+
+from flask import redirect, url_for
 
 @app.route("/delete_all", methods=["POST"])
 def delete_all():
@@ -78,7 +136,8 @@ def delete_all():
         if f.endswith(".zip"):
             os.remove(os.path.join(UPLOAD_FOLDER, f))
 
-    return "Deleted"
+    return redirect(url_for("inbox"))
+
 
 
 # -------- Run --------

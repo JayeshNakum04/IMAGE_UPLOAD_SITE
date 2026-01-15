@@ -1,55 +1,143 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inbox</title>
+
 <style>
 body {
-    font-family: Arial, sans-serif;
-    background: #f2f3f7;
+    margin: 0;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 16px;
 }
-.box {
+
+.container {
     max-width: 500px;
-    margin: 60px auto;
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 15px 30px rgba(0,0,0,.15);
+    margin: auto;
 }
+
+.card {
+    background: white;
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+    animation: fadeUp .5s ease;
+}
+
+@keyframes fadeUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.nav {
+    text-align: center;
+    margin-bottom: 12px;
+    font-size: 14px;
+}
+
+.nav a {
+    text-decoration: none;
+    color: #555;
+    margin: 0 8px;
+}
+
+h2 {
+    text-align: center;
+    margin: 10px 0 15px;
+}
+
 input, button {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
+    margin-top: 12px;
+    border-radius: 10px;
+    font-size: 15px;
+}
+
+input {
+    border: 1px solid #ddd;
+}
+
+button {
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.primary {
+    background: #667eea;
+    color: white;
+}
+
+.danger {
+    background: #e53935;
+    color: white;
+}
+
+.file-card {
+    background: #f6f7fb;
+    border-radius: 14px;
+    padding: 14px;
+    margin-top: 12px;
+    animation: fadeUp .4s ease;
+}
+
+.file-name {
+    font-size: 14px;
+    word-break: break-all;
+}
+
+.actions {
+    display: flex;
+    gap: 10px;
     margin-top: 10px;
 }
-button {
-    background: #667eea;
-    border: none;
-    color: white;
-    border-radius: 8px;
-    cursor: pointer;
-}
-.delete {
-    background: #e53935;
-}
-a {
+
+.actions a, .actions button {
+    flex: 1;
+    text-align: center;
+    padding: 10px;
+    border-radius: 10px;
     text-decoration: none;
+    font-size: 14px;
+}
+
+.download {
+    background: #667eea;
+    color: white;
+}
+
+.copy {
+    background: #eceff7;
+    color: #333;
+}
+
+.empty {
+    text-align: center;
+    opacity: .6;
+    margin-top: 30px;
 }
 .error {
     color: red;
     text-align: center;
-}
-.item {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 8px;
 }
 </style>
 </head>
 
 <body>
 
-<div class="box">
+<div class="container">
+<div class="card">
+
+<div class="nav">
+    <a href="/generate">🔁 Generate</a>
+</div>
 
 {% if files is not defined %}
+
     <h2>🔐 Inbox Login</h2>
 
     {% if error %}
@@ -58,34 +146,49 @@ a {
 
     <form method="POST">
         <input type="password" name="password" placeholder="Inbox password" required>
-        <button>Enter Inbox</button>
+        <button class="primary">Enter Inbox</button>
     </form>
 
 {% else %}
+
     <h2>📥 Inbox</h2>
 
     {% if files %}
         <form method="POST" action="/delete_all"
               onsubmit="return confirm('Delete ALL uploads?')">
             <input type="hidden" name="password" value="{{ password }}">
-            <button class="delete">🗑 Delete All</button>
+            <button class="danger">🗑 Delete All</button>
         </form>
 
-        <div style="margin-top:15px">
         {% for f in files %}
-            <div class="item">
-                <span>{{ f }}</span>
-                <a href="/download/{{ f }}">⬇ Download</a>
+        <div class="file-card">
+            <div class="file-name">📦 {{ f }}</div>
+            <div class="actions">
+                <a class="download" href="/download/{{ f }}">⬇ Download</a>
+                <button class="copy" onclick="copyLink('{{ base_url }}/download/{{ f }}')">
+                    📋 Copy
+                </button>
             </div>
-        {% endfor %}
         </div>
+        {% endfor %}
     {% else %}
-        <p>No uploads yet</p>
+        <div class="empty">
+            <p>📭 No uploads yet</p>
+        </div>
     {% endif %}
 
 {% endif %}
 
 </div>
+</div>
+
+<script>
+function copyLink(link) {
+    navigator.clipboard.writeText(link).then(() => {
+        alert("✅ Download link copied");
+    });
+}
+</script>
 
 </body>
 </html>
