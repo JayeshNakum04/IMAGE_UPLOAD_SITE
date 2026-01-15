@@ -69,20 +69,31 @@ def upload(token):
             abort(403)
 
         files = request.files.getlist("photos")
-        if not files or files[0].filename == "":
+        files = [f for f in files if f.filename]
+
+        if not files:
             abort(400)
 
-        upload_id = str(uuid.uuid4())
-        zip_path = os.path.join(UPLOAD_FOLDER, f"{upload_id}.zip")
-
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zipf:
+        # CASE 1: 1–5 files → save individually
+        if len(files) <= 5:
             for f in files:
-                zipf.writestr(f.filename, f.read())
+                safe_name = f"{uuid.uuid4()}_{f.filename}"
+                f.save(os.path.join(UPLOAD_FOLDER, safe_name))
+
+        # CASE 2: 6+ files → ZIP
+        else:
+            upload_id = str(uuid.uuid4())
+            zip_path = os.path.join(UPLOAD_FOLDER, f"{upload_id}.zip")
+
+            with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zipf:
+                for f in files:
+                    zipf.writestr(f.filename, f.read())
 
         VALID_TOKENS.remove(token)
         return "Upload successful. You can close this page."
 
     return render_template("upload.html")
+
 
 # -------- Inbox --------
 @app.route("/inbox", methods=["GET", "POST"])
@@ -94,13 +105,17 @@ def inbox():
         if request.form.get("password") != INBOX_PASSWORD:
             return render_template("inbox.html", error="Wrong password")
 
-        files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith(".zip")]
+        files = [
+                    f for f in os.listdir(UPLOAD_FOLDER)
+                    if os.path.isfile(os.path.join(UPLOAD_FOLDER, f))
+                ]           
+
         return render_template(
                 "inbox.html",
                 files=files,
                 password=request.form.get("password"),
                 base_url=request.host_url.rstrip("/")
-        )
+            )
 
 
     return render_template("inbox.html")
