@@ -1,69 +1,37 @@
 import os
 import uuid
 import zipfile
-import time
-from flask import Flask, render_template, request, send_file, abort, redirect, url_for
+from flask import Flask, request, render_template, send_file, abort
 
 app = Flask(__name__)
 
-# ======================
-# ENV CONFIG
-# ======================
-UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD")
-INBOX_PASSWORD = os.environ.get("INBOX_PASSWORD")
-
-if not UPLOAD_PASSWORD or not INBOX_PASSWORD:
-    raise RuntimeError("Required environment variables not set")
+UPLOAD_PASSWORD = os.environ.get("UPLOAD_PASSWORD", "2409004")
+INBOX_PASSWORD = os.environ.get("INBOX_PASSWORD", "admin123")
 
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-TOKEN_STORE = set()
-EXPIRY_SECONDS = 24 * 60 * 60  # 24 hours
+VALID_TOKENS = set()
 
-# ======================
-# UTIL: CLEANUP OLD FILES
-# ======================
-def cleanup_expired_uploads():
-    now = time.time()
-    for folder in os.listdir(UPLOAD_FOLDER):
-        path = os.path.join(UPLOAD_FOLDER, folder)
-        if not os.path.isdir(path):
-            continue
-
-        created = os.path.getctime(path)
-        if now - created > EXPIRY_SECONDS:
-            for f in os.listdir(path):
-                os.remove(os.path.join(path, f))
-            os.rmdir(path)
-
-# ======================
-# GENERATE ONE-TIME LINK
-# ======================
+# -------- Generate one-time upload link --------
 @app.route("/generate")
 def generate():
     token = str(uuid.uuid4())
-    TOKEN_STORE.add(token)
-    return f"""
-    <h3>One-time upload link</h3>
-    <a href="/upload/{token}">/upload/{token}</a><br><br>
-    <a href="/inbox">Inbox</a>
-    """
+    VALID_TOKENS.add(token)
+    return f"Upload link: /upload/{token}"
 
-# ======================
-# UPLOAD PAGE (FRIEND)
-# ======================
+# -------- Upload page --------
 @app.route("/upload/<token>", methods=["GET", "POST"])
 def upload(token):
-    if token not in TOKEN_STORE:
+    if token not in VALID_TOKENS:
         abort(403)
 
     if request.method == "POST":
         if request.form.get("password") != UPLOAD_PASSWORD:
-            abort(401)
+            abort(403)
 
-        files = [f for f in request.files.getlist("photos") if f.filename]
-        if not files:
+        files = request.files.getlist("photos")
+        if not files or files[0].filename == "":
             abort(400)
 
         upload_id = str(uuid.uuid4())
@@ -73,65 +41,47 @@ def upload(token):
             for f in files:
                 zipf.writestr(f.filename, f.read())
 
-        TOKEN_STORE.remove(token)
-        return "UPLOAD_OK"
+        VALID_TOKENS.remove(token)
+        return "Upload successful. You can close this page."
 
     return render_template("upload.html")
 
-# ======================
-# INBOX LOGIN
-# ======================
+# -------- Inbox --------
 @app.route("/inbox", methods=["GET", "POST"])
 def inbox():
     if request.method == "POST":
         if request.form.get("password") != INBOX_PASSWORD:
-            return render_template(
-                "inbox.html",
-                logged_in=False,
-                error="Wrong password"
-            )
+            return render_template("inbox.html", error="Wrong password")
 
-        uploads = []
-        for f in os.listdir(UPLOAD_FOLDER):
-            if f.endswith(".zip"):
-                uploads.append({
-                    "id": f,
-                    "time": time.ctime(os.path.getctime(os.path.join(UPLOAD_FOLDER, f)))
-                })
+        files = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith(".zip")]
+        return render_template("inbox.html", files=files, password=request.form.get("password"))
 
-        return render_template(
-            "inbox.html",
-            logged_in=True,
-            uploads=uploads
-        )
+    return render_template("inbox.html")
 
-    return render_template("inbox.html", logged_in=False)
 
-# ======================
-# DOWNLOAD + DELETE
-# ======================
-from flask import after_this_request
-
+# -------- Download --------
 @app.route("/download/<filename>")
 def download(filename):
     path = os.path.join(UPLOAD_FOLDER, filename)
     if not os.path.exists(path):
         abort(404)
-
-    @after_this_request
-    def cleanup(response):
-        try:
-            os.remove(path)
-        except:
-            pass
-        return response
-
     return send_file(path, as_attachment=True)
 
+#--------Delete from inbox -------
 
-# ======================
-# RUN (RENDER SAFE)
-# ======================
+@app.route("/delete_all", methods=["POST"])
+def delete_all():
+    if request.form.get("password") != INBOX_PASSWORD:
+        abort(403)
+
+    for f in os.listdir(UPLOAD_FOLDER):
+        if f.endswith(".zip"):
+            os.remove(os.path.join(UPLOAD_FOLDER, f))
+
+    return "Deleted"
+
+
+# -------- Run --------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
